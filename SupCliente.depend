@@ -1,0 +1,12 @@
+# depslib dependency file v1.0
+1737772325 source:c:\users\aninh\onedrive\documentos\proj pa\suptanques\supdados.cpp
+	<iostream>
+	<iomanip>
+	<string>
+	"tanques-param.h"
+	"supdados.h"
+
+1737772325 c:\users\aninh\onedrive\documentos\proj pa\suptanques\tanques-param.h
+
+1737772325 c:\users\aninh\onedrive\documentos\proj pa\suptanques\supdados.h
+
