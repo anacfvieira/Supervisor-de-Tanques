@@ -110,11 +110,11 @@ private:
   // Exclusao mutua para nao enviar novo comando antes de
   // receber a resposta do comando anterior
   /* ACRESCENTAR */
-  mutex mtx_client;
+  std::mutex mtx_client;
 
   // Identificador da thread de solicitacao periodica de dados
   /* ACRESCENTAR */
-  thread thr_client;
+  std::thread thr_client;
 };
 
 #endif // _SUP_CLIENTE_H_
