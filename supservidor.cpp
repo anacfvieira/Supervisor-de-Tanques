@@ -198,6 +198,10 @@ bool SupServidor::removeUser(const string& Login)
 /// Comunicacao com os clientes atraves dos sockets.
 void SupServidor::thr_server_main(void)
 {
+  LUitr iU;
+
+  SupState S;
+
   // Fila de sockets para aguardar chegada de dados
   /*ACRESCENTAR*/
   mysocket_queue Q;
@@ -266,13 +270,16 @@ void SupServidor::thr_server_main(void)
         case mysocket_status::SOCK_OK:
           try {
             //Testa se houve atividade nos sockets dos clientes
-            for (auto& U : LU) {
-              if (server_on && U.isConnected() && Q.had_activity(U.sock)) {
+            for (iU = LU.begin(); iU != LU.end(); ++iU){
+              if (server_on && iU->isConnected() && Q.had_activity(iU->sock)) {
                 //Leh o comando
                 int16_t cmd;
-                iResult = U.sock.read_int16(cmd);
+                iResult = iU->sock.read_int16(cmd);
                 //Executa a acao
                 if (iResult == mysocket_status::SOCK_OK) {
+                  string login, senha;
+                  uint16_t Open, Input;
+                  SupState S;
                   switch (cmd) {
                     //Testa se houve atividade nos sockets dos clientes. Se sim:
                       //   - Leh o comando
@@ -280,82 +287,144 @@ void SupServidor::thr_server_main(void)
                       //   = Envia resposta
                       case CMD_LOGIN:
                         //Leh login e senha
-                        string login, senha;
-                        iResult = U.sock.read_string(login);
-                        iResult = U.sock.read_string(senha);
+                        iResult = iU->sock.read_string(login);
+                        iResult = iU->sock.read_string(senha);
                         //Testa usuario
-                        if (U.login == login && U.password == senha) {
+                        if (iU->login == login && iU->password == senha) {
                           //Se deu tudo certo, faz o socket temporario ser o novo socket
                           //do cliente e envia confirmacao
-                          U.sock.write_int16(U.isAdmin ? CMD_ADMIN_OK : CMD_OK);
+                          iU->sock.write_int16(iU->isAdmin ? CMD_ADMIN_OK : CMD_OK);
                         } else {
                           //Se deu tudo errado, envia erro
-                          U.sock.write_int16(CMD_ERROR);
+                          iU->sock.write_int16(CMD_ERROR);
                         }
                         break;
                       case CMD_GET_DATA:
                         //Leh o estado dos tanques
-                        SupState S;
+//Testa se houve atividade no socket de conexao
+            if (server_on && Q.had_activity(sock_server) && sock_server.connected()) {
+              //Estabelece nova conexao em socket temporario
+              tcp_mysocket sock_temp;
+              iResult = sock_server.accept(sock_temp);
+              //Leh comando, login e senha
+              int16_t cmd;
+              iResult = sock_temp.read_int16(cmd);
+              string login, senha;
+              iResult = sock_temp.read_string(login);
+              iResult = sock_temp.read_string(senha);
+              //Testa usuario
+              auto itr = find(LU.begin(), LU.end(), login);
+              if (itr != LU.end() && itr->password == senha) {
+                //Se deu tudo certo, faz o socket temporario ser o novo socket
+                //do cliente e envia confirmacao
+                itr->sock.swap(sock_temp);
+                itr->sock.write_int16(itr->isAdmin ? CMD_ADMIN_OK : CMD_OK);
+              } else {
+                //Se deu tudo errado, envia erro
+                sock_temp.write_int16(CMD_ERROR);
+                sock_temp.close();
+              }
+            }
                         readStateFromSensors(S);
                         //Envia o estado dos tanques
-                        U.sock.write_int16(CMD_DATA);
-                        U.sock.write_uint16(S.V1);
-                        U.sock.write_uint16(S.V2);
-                        U.sock.write_uint16(S.H1);
-                        U.sock.write_uint16(S.H2);
-                        U.sock.write_uint16(S.PumpInput);
-                        U.sock.write_uint16(S.PumpFlow);
-                        U.sock.write_uint16(S.ovfl);
+                        iU->sock.write_int16(CMD_GET_DATA);
+                        iU->sock.write_uint16(S.H1);
+                        iU->sock.write_uint16(S.H2);
+                        iU->sock.write_uint16(S.PumpInput);
+                        iU->sock.write_uint16(S.PumpFlow);
+                        iU->sock.write_uint16(S.V1);
+                        iU->sock.write_uint16(S.V2);
+                        iU->sock.write_uint16(S.ovfl);
                         break;
                       case CMD_SET_V1:
+                        //Envia mensagem avisando que o comando foi recebido
+                        iU->sock.write_int16(CMD_SET_V1);
                         //Leh o parametro do comando
                         uint16_t Open;
-                        iResult = U.sock.read_uint16(Open);
+                        iResult = iU->sock.read_uint16(Open);
                         //Executa a acao
-                        if (iResult == mysocket_status::SOCK_OK) {
+                        if (iResult == mysocket_status::SOCK_OK && iU->isAdmin) {
                           setV1Open(Open != 0);
                           //Envia resposta
-                          U.sock.write_int16(CMD_OK);
+                          iU->sock.write_int16(CMD_OK);
                         } else {
                           //Envia erro
-                          U.sock.write_int16(CMD_ERROR);
+                          iU->sock.write_int16(CMD_ERROR);
                         }
                         break;
                       case CMD_SET_V2:
+                        //Envia mensagem avisando que o comando foi recebido
+                        iU->sock.write_int16(CMD_SET_V2);
                         //Leh o parametro do comando
-                        iResult = U.sock.read_uint16(Open);
+                        iResult = iU->sock.read_uint16(Open);
                         //Executa a acao
-                        if (iResult == mysocket_status::SOCK_OK) {
+                        if (iResult == mysocket_status::SOCK_OK && iU->isAdmin) {
                           setV2Open(Open != 0);
                           //Envia resposta
-                          U.sock.write_int16(CMD_OK);
+                          iU->sock.write_int16(CMD_OK);
                         } else {
                           //Envia erro
-                          U.sock.write_int16(CMD_ERROR);
+                          iU->sock.write_int16(CMD_ERROR);
                         }
                         break;
                       case CMD_SET_PUMP:
+                        //Envia mensagem avisando que o comando foi recebido
+                        iU->sock.write_int16(CMD_SET_PUMP);
                         //Leh o parametro do comando
                         uint16_t Input;
-                        iResult = U.sock.read_uint16(Input);
+                        iResult = iU->sock.read_uint16(Input);
                         //Executa a acao
-                        if (iResult == mysocket_status::SOCK_OK) {
+                        if (iResult == mysocket_status::SOCK_OK && iU->isAdmin) {
                           setPumpInput(Input);
                           //Envia resposta
-                          U.sock.write_int16(CMD_OK);
+                          iU->sock.write_int16(CMD_OK);
                         } else {
                           //Envia erro
-                          U.sock.write_int16(CMD_ERROR);
+                          iU->sock.write_int16(CMD_ERROR);
                         }
                         break;
                       default:
-                        
+                        //Envia erro
+                        iU->sock.write_int16(CMD_ERROR);
+                        break;
+
+                  }
+                }
+              }
             }
           }
-        
+        //Catch se houve erro na comunicação
+        catch (const char* err) {
+          cerr << "Erro na comunicacao com o cliente: " << err << endl;
+          iU->sock.close();
+        }
+        //Testa se houve atividade no socket de conexao
+        if (server_on && Q.had_activity(sock_server)) {
+          //Estabelece nova conexao em socket temporario
+          tcp_mysocket sock_temp;
+          iResult = sock_server.accept(sock_temp);
+          //Leh comando, login e senha
+          int16_t cmd;
+          iResult = sock_temp.read_int16(cmd);
+          string login, senha;
+          iResult = sock_temp.read_string(login);
+          iResult = sock_temp.read_string(senha);
+          //Testa usuario
+          iU = find(LU.begin(), LU.end(), login);
+          if (iU != LU.end() && iU->password == senha) {
+            //Se deu tudo certo, faz o socket temporario ser o novo socket
+            //do cliente e envia confirmacao
+            iU->sock.swap(sock_temp);
+            iU->sock.write_int16(iU->isAdmin ? CMD_ADMIN_OK : CMD_OK);
+          } else {
+            //Se deu tudo errado, envia erro
+            sock_temp.write_int16(CMD_ERROR);
+            sock_temp.close();
+          }
+        }
       }
-
-    } // fim try - Erros mais graves que encerram o servidor
+    }
+        // fim try - Erros mais graves que encerram o servidor
     catch(const char* err)  // Erros mais graves que encerram o servidor
     {
       cerr << "Erro no servidor: " << err << endl;
@@ -374,6 +443,7 @@ void SupServidor::thr_server_main(void)
     } // fim catch - Erros mais graves que encerram o servidor
   } // fim while (server_on)
 }
+
 
 
 
