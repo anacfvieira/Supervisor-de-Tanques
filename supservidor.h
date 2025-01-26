@@ -6,7 +6,7 @@
 #include <list>
 #include "tanques.h"
 #include "supdados.h"
-#include "mysocket.h"
+#include "MySocket/mysocket.h"
 
 /// A classe que implementa o servidor do sistema de tanques
 class SupServidor: public Tanks
@@ -76,10 +76,13 @@ private:
   std::list<User> LU;
 
   // Identificador da thread do servidor
-  thread thr_server;
+  std::thread thr_server;
 
   // Socket de conexoes
   tcp_mysocket_server sock_server;
+
+  //Apelido do iterador
+  typedef std::list<User>::iterator LUitr;
 
 
   // Leitura do estado dos tanques a partir dos sensores
